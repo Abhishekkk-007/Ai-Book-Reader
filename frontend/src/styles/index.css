@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary: #f7f6f3;
+    --bg-secondary: #ede9e0;
+    --bg-card: #ffffff;
+    --text-primary: #1a1713;
+    --text-secondary: #5d5040;
+    --text-muted: #9e9073;
+    --border: #d6cfc0;
+    --accent: #f97316;
+    --accent-hover: #ea6c0a;
+  }
+
+  .dark {
+    --bg-primary: #0f0d0b;
+    --bg-secondary: #1a1713;
+    --bg-card: #231e19;
+    --text-primary: #f0ece3;
+    --text-secondary: #bbb09a;
+    --text-muted: #73644e;
+    --border: #3a3228;
+    --accent: #fb923c;
+    --accent-hover: #f97316;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { font-family: 'DM Sans', system-ui, sans-serif; }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  #root { height: 100vh; overflow: hidden; }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  ::selection { background: rgba(249, 115, 22, 0.25); color: var(--text-primary); }
+}
+
+@layer components {
+  .glass {
+    background: rgba(var(--bg-card), 0.85);
+    backdrop-filter: blur(12px);
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 rounded-lg font-sans font-medium text-sm
+      bg-ember-500 hover:bg-ember-600 text-white
+      transition-all duration-150 active:scale-95
+      focus:outline-none focus:ring-2 focus:ring-ember-400/50;
+  }
+
+  .btn-ghost {
+    @apply px-3 py-2 rounded-lg font-sans text-sm
+      text-[var(--text-secondary)] hover:text-[var(--text-primary)]
+      hover:bg-[var(--bg-secondary)]
+      transition-all duration-150 active:scale-95
+      focus:outline-none;
+  }
+
+  .card {
+    @apply rounded-xl border border-[var(--border)]
+      bg-[var(--bg-card)]
+      transition-all duration-200;
+  }
+
+  .input-base {
+    @apply w-full px-3 py-2 rounded-lg text-sm
+      bg-[var(--bg-secondary)] border border-[var(--border)]
+      text-[var(--text-primary)] placeholder-[var(--text-muted)]
+      focus:outline-none focus:ring-2 focus:ring-ember-400/40 focus:border-ember-400/60
+      transition-all duration-150;
+  }
+
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg
+      text-sm text-[var(--text-secondary)]
+      hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]
+      transition-all duration-150 cursor-pointer;
+  }
+
+  .sidebar-item.active {
+    @apply text-ember-400 bg-ember-500/10;
+  }
+}
+
+/* PDF Page Styles */
+.react-pdf__Page {
+  margin-bottom: 16px !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.react-pdf__Page__canvas {
+  display: block !important;
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* Highlight layer */
+.react-pdf__Page__textContent {
+  user-select: text !important;
+}
+
+/* TTS sentence highlight */
+.tts-highlight {
+  background: rgba(249, 115, 22, 0.3);
+  border-radius: 2px;
+  animation: pulseSoft 1.5s ease-in-out infinite;
+}
+
+/* Loading spinner */
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Progress bar */
+.progress-bar {
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), #f59e0b);
+  transition: width 0.5s ease;
+}
+
+/* Tooltip */
+.tooltip {
+  @apply absolute z-50 px-2 py-1 text-xs rounded
+    bg-[var(--bg-card)] border border-[var(--border)]
+    text-[var(--text-primary)] shadow-xl
+    pointer-events-none whitespace-nowrap;
+}
