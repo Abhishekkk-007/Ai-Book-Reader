@@ -4,6 +4,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { useReader } from '../../context/ReaderContext';
 import HighlightToolbar from './HighlightToolbar';
+import { uploadsUrl } from '../../utils/api';
 
 export default function PDFReader({
   book,
@@ -36,24 +37,22 @@ export default function PDFReader({
     return () => ro.disconnect();
   }, []);
 
-  // Scroll to current page when it changes (e.g. from sidebar jump or search)
+  // Scroll to current page when it changes (sidebar jump, search result, etc.)
   useEffect(() => {
     const el = pageRefs.current[currentPage];
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [currentPage]);
 
-  // Jump to the page of the active search result
+  // Jump to page of active search result
   useEffect(() => {
     if (searchResults.length > 0 && activeSearchResult < searchResults.length) {
-      const r = searchResults[activeSearchResult];
-      setCurrentPage(r.page);
+      setCurrentPage(searchResults[activeSearchResult].page);
     }
   }, [activeSearchResult, searchResults, setCurrentPage]);
 
   // IntersectionObserver: update currentPage as user scrolls naturally
   useEffect(() => {
     if (!containerRef.current || numPages === 0) return;
-
     const obs = new IntersectionObserver(
       (entries) => {
         let best = null;
@@ -71,7 +70,6 @@ export default function PDFReader({
       },
       { root: containerRef.current, threshold: [0.3, 0.5, 0.7] }
     );
-
     const refs = pageRefs.current;
     Object.values(refs).forEach((el) => { if (el) obs.observe(el); });
     return () => obs.disconnect();
@@ -83,35 +81,22 @@ export default function PDFReader({
 
   // Cache page text for TTS + Search
   const onPageLoadSuccess = useCallback(async (page) => {
-    const pageNum = page.pageNumber;
     try {
       const content = await page.getTextContent();
-      const text = content.items.map((item) => item.str).join(' ');
-      pageTextsRef.current[pageNum] = text;
+      pageTextsRef.current[page.pageNumber] = content.items.map((i) => i.str).join(' ');
     } catch {
-      // Non-critical — page may have no text layer
+      // Non-critical
     }
   }, [pageTextsRef]);
 
-  // Text selection → show highlight toolbar
+  // Text selection → highlight toolbar
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) {
-      setHlToolbar(null);
-      return;
-    }
+    if (!sel || sel.isCollapsed) { setHlToolbar(null); return; }
     const text = sel.toString().trim();
-    if (text.length < 3) {
-      setHlToolbar(null);
-      return;
-    }
-    const range = sel.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    setHlToolbar({
-      text,
-      x: rect.left + rect.width / 2,
-      y: rect.top,
-    });
+    if (text.length < 3) { setHlToolbar(null); return; }
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    setHlToolbar({ text, x: rect.left + rect.width / 2, y: rect.top });
   }, []);
 
   const handleHighlight = useCallback((payload) => {
@@ -120,12 +105,13 @@ export default function PDFReader({
     onHighlight({ ...payload, page: currentPage });
   }, [onHighlight, currentPage]);
 
-  // Page width: fit container minus padding, capped at 900px, scaled by zoom
   const pageWidth = Math.min(containerWidth - 48, 900) * zoom;
 
   if (!book?.filename) return null;
 
-  const pdfUrl = `/uploads/${book.filename}`;
+  // BUG FIX: was '/uploads/filename' which only worked locally via Vite proxy.
+  // Now uses uploadsUrl() which prepends VITE_API_URL in production.
+  const pdfUrl = uploadsUrl(book.filename);
 
   return (
     <div
@@ -144,20 +130,7 @@ export default function PDFReader({
               <p className="text-sm text-[var(--text-muted)]">Loading PDF…</p>
             </div>
           }
-          error={
-            <div className="flex flex-col items-center justify-center h-96 gap-4 text-center max-w-sm mx-auto">
-              <div className="text-5xl">⚠️</div>
-              <div>
-                <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">
-                  Failed to load PDF
-                </p>
-                <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                  Make sure the backend is running on port 5000 and the file exists in{' '}
-                  <code className="font-mono bg-[var(--bg-card)] px-1 rounded">backend/uploads/</code>
-                </p>
-              </div>
-            </div>
-          }
+          error={<PDFError filename={book.filename} />}
           noData={
             <div className="flex flex-col items-center justify-center h-96 gap-3">
               <div className="text-5xl">📄</div>
@@ -192,19 +165,13 @@ export default function PDFReader({
                       className="bg-[var(--bg-card)] rounded flex items-center justify-center shadow-lg"
                       style={{ width: pageWidth, height: Math.round(pageWidth * 1.414) }}
                     >
-                      <p className="text-xs text-[var(--text-muted)]">Page {pageNum} failed</p>
+                      <p className="text-xs text-[var(--text-muted)]">Page {pageNum} failed to render</p>
                     </div>
                   }
                 />
-
-                {/* Page number badge */}
                 <div className="flex justify-center mt-2">
-                  <span
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full
-                      ${pageNum === currentPage
-                        ? 'bg-ember-500/20 text-ember-400'
-                        : 'text-[var(--text-muted)]'}`}
-                  >
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full
+                    ${pageNum === currentPage ? 'bg-ember-500/20 text-ember-400' : 'text-[var(--text-muted)]'}`}>
                     {pageNum}
                   </span>
                 </div>
@@ -213,7 +180,6 @@ export default function PDFReader({
         </Document>
       </div>
 
-      {/* Highlight colour picker toolbar */}
       {hlToolbar && (
         <HighlightToolbar
           x={hlToolbar.x}
@@ -223,6 +189,26 @@ export default function PDFReader({
           onClose={() => setHlToolbar(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ─── Detailed error component ─────────────────────────────────────────────────
+function PDFError({ filename }) {
+  const pdfUrl = uploadsUrl(filename);
+  return (
+    <div className="flex flex-col items-center justify-center min-h-96 gap-4 text-center max-w-md mx-auto p-6">
+      <div className="text-5xl">⚠️</div>
+      <div>
+        <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">Failed to load PDF</p>
+        <div className="text-left space-y-2 text-xs text-[var(--text-muted)] bg-[var(--bg-card)] rounded-lg p-3 border border-[var(--border)]">
+          <p className="font-medium text-[var(--text-secondary)] mb-2">Checklist:</p>
+          <p>1. Backend running? → <a href="/api/health" target="_blank" rel="noreferrer" className="text-ember-400 underline">/api/health</a></p>
+          <p>2. File URL reachable? → <a href={pdfUrl} target="_blank" rel="noreferrer" className="text-ember-400 underline break-all">{pdfUrl}</a></p>
+          <p>3. CORS configured? Check <code className="bg-[var(--bg-secondary)] px-1 rounded">ALLOWED_ORIGINS</code> in backend env.</p>
+          <p>4. On Render? Files in <code className="bg-[var(--bg-secondary)] px-1 rounded">uploads/</code> are ephemeral — use S3/Cloudinary for production storage.</p>
+        </div>
+      </div>
     </div>
   );
 }

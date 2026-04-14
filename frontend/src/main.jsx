@@ -4,9 +4,12 @@ import App from './App';
 import './styles/index.css';
 import { pdfjs } from 'react-pdf';
 
-// ✅ Vite fix: use CDN worker URL matching the installed pdfjs-dist version.
-// Do NOT use `new URL('pdfjs-dist/...', import.meta.url)` — Vite cannot bundle
-// the worker correctly and causes "WorkerMessageHandler undefined" error.
+// ─── PDF.js worker (Vite-safe) ────────────────────────────────────────────────
+// Using `new URL('pdfjs-dist/...', import.meta.url)` fails in Vite because
+// Vite cannot statically analyze & bundle the worker file.
+//
+// Solution: point to the CDN worker that exactly matches the installed version.
+// `pdfjs.version` is read at runtime from the package so versions never drift.
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 ReactDOM.createRoot(document.getElementById('root')).render(
