@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 
 export function useBooks() {
-  const [books, setBooks] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [books, setBooks]       = useState([]);
+  const [loading, setLoading]   = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError]       = useState(null);
 
   const fetchBooks = useCallback(async () => {
     setLoading(true);
@@ -24,14 +24,22 @@ export function useBooks() {
 
   const uploadBook = useCallback(async (file, title, author) => {
     setUploading(true);
+    setError(null);
     try {
       const form = new FormData();
       form.append('pdf', file);
-      if (title) form.append('title', title);
+      if (title)  form.append('title',  title);
       if (author) form.append('author', author);
-      const { data } = await api.post('/books/upload', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+
+      // ─── FIX 1 ───────────────────────────────────────────────────────────────
+      // Do NOT manually set Content-Type for multipart/form-data.
+      // The browser must set it automatically so it can append the boundary
+      // string (e.g. "multipart/form-data; boundary=----XYZ").
+      // Without the boundary the server cannot parse the body and returns 404/400.
+      // ─────────────────────────────────────────────────────────────────────────
+      const { data } = await api.post('/books/upload', form);
+      // ↑  No `headers` override — Axios + browser handle Content-Type correctly.
+
       setBooks((prev) => [data.book, ...prev]);
       return data.book;
     } catch (err) {

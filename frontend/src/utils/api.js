@@ -1,38 +1,54 @@
 import axios from 'axios';
 
-// ─── API base URL ─────────────────────────────────────────────────────────────
-// BUG FIX: was hardcoded to '/api' which only works when Vite's dev proxy is
-// running.  In production (Render static site) there is no proxy — requests
-// to '/api' hit the same static host and 404.
-//
-// Solution: set VITE_API_URL in your Render frontend environment variables:
-//   VITE_API_URL=https://your-backend-name.onrender.com
-//
-// Locally, leave VITE_API_URL unset and the Vite proxy handles '/api'.
+// ─── Base URL ─────────────────────────────────────────────────────────────────
+// Local dev  → VITE_API_URL is unset → baseURL = '/api'  (Vite proxy forwards to :5000)
+// Production → VITE_API_URL = 'https://folio-backend.onrender.com'
+//              baseURL = 'https://folio-backend.onrender.com/api'
 const BASE_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
   : '/api';
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000,
-  withCredentials: true,
+  timeout: 60000, // 60s — give uploads time to complete on cold Render instances
+
+  // ─── FIX 2 ─────────────────────────────────────────────────────────────────
+  // withCredentials: true causes the browser to send a CORS preflight (OPTIONS)
+  // for every cross-origin request. The server must then respond with:
+  //   Access-Control-Allow-Credentials: true
+  //   Access-Control-Allow-Origin: <exact origin>  (not *)
+  // If either is missing the preflight fails and the actual request never fires.
+  //
+  // We only need withCredentials if we're using cookies/sessions. This app uses
+  // none — remove it to eliminate an entire class of CORS preflight failures.
+  // ───────────────────────────────────────────────────────────────────────────
+  withCredentials: false,
 });
 
+// ─── Request logger (dev only) ────────────────────────────────────────────────
 api.interceptors.request.use((config) => {
-  // Log in development to confirm the right URL is being used
   if (import.meta.env.DEV) {
-    console.debug(`[API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    console.debug(`[API →] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
   }
   return config;
 });
 
+// ─── Response logger ─────────────────────────────────────────────────────────
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    if (import.meta.env.DEV) {
+      console.debug(`[API ←] ${res.status} ${res.config.url}`);
+    }
+    return res;
+  },
   (err) => {
-    const msg = err.response?.data?.error || err.message;
-    const status = err.response?.status;
-    console.error(`[API Error] ${status || 'Network'}: ${msg}`);
+    const status  = err.response?.status;
+    const message = err.response?.data?.error || err.message;
+    const url     = err.config?.url;
+    const base    = err.config?.baseURL;
+
+    // Print the full URL that was actually requested — makes 404 debugging trivial
+    console.error(`[API Error] ${status ?? 'Network'} on ${base}${url} — ${message}`);
     return Promise.reject(err);
   }
 );
@@ -40,9 +56,9 @@ api.interceptors.response.use(
 export default api;
 
 // ─── Uploads URL helper ───────────────────────────────────────────────────────
-// Use this wherever you build a URL to a stored PDF or asset.
-// Locally:     /uploads/filename.pdf   (served by Vite proxy → backend)
-// Production:  https://your-backend.onrender.com/uploads/filename.pdf
+// Always use this to build URLs pointing at stored files.
+// Local:      /uploads/uuid.pdf          (Vite proxy → backend :5000)
+// Production: https://backend.onrender.com/uploads/uuid.pdf
 export function uploadsUrl(filename) {
   if (!filename) return '';
   const base = import.meta.env.VITE_API_URL || '';
